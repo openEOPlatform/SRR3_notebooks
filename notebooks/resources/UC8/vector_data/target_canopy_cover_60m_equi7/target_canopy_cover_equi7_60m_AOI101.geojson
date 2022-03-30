@@ -1,0 +1,181 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "0",
+      "type": "Feature",
+      "properties": {
+        "target_canopy_cover": 1.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              5015720.0,
+              1609420.0
+            ],
+            [
+              5015780.0,
+              1609420.0
+            ],
+            [
+              5015780.0,
+              1609480.0
+            ],
+            [
+              5015720.0,
+              1609480.0
+            ],
+            [
+              5015720.0,
+              1609420.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "id": "1",
+      "type": "Feature",
+      "properties": {
+        "target_canopy_cover": 1.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              5015720.0,
+              1609360.0
+            ],
+            [
+              5015780.0,
+              1609360.0
+            ],
+            [
+              5015780.0,
+              1609420.0
+            ],
+            [
+              5015720.0,
+              1609420.0
+            ],
+            [
+              5015720.0,
+              1609360.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "id": "2",
+      "type": "Feature",
+      "properties": {
+        "target_canopy_cover": 0.6946371943595295
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              5015780.0,
+              1609480.0
+            ],
+            [
+              5015840.0,
+              1609480.0
+            ],
+            [
+              5015840.0,
+              1609540.0
+            ],
+            [
+              5015780.0,
+              1609540.0
+            ],
+            [
+              5015780.0,
+              1609480.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "id": "3",
+      "type": "Feature",
+      "properties": {
+        "target_canopy_cover": 0.8807129026901547
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              5015780.0,
+              1609420.0
+            ],
+            [
+              5015840.0,
+              1609420.0
+            ],
+            [
+              5015840.0,
+              1609480.0
+            ],
+            [
+              5015780.0,
+              1609480.0
+            ],
+            [
+              5015780.0,
+              1609420.0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "id": "4",
+      "type": "Feature",
+      "properties": {
+        "target_canopy_cover": 1.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              5015780.0,
+              1609360.0
+            ],
+            [
+              5015840.0,
+              1609360.0
+            ],
+            [
+              5015840.0,
+              1609420.0
+            ],
+            [
+              5015780.0,
+              1609420.0
+            ],
+            [
+              5015780.0,
+              1609360.0
+            ]
+          ]
+        ]
+      }
+    }
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "PROJCRS[\"Azimuthal_Equidistant\",BASEGEOGCRS[\"WGS 84\",DATUM[\"World Geodetic System 1984\",ELLIPSOID[\"WGS 84\",6378137,298.257223563,LENGTHUNIT[\"metre\",1]]],PRIMEM[\"Greenwich\",0,ANGLEUNIT[\"degree\",0.0174532925199433]],ID[\"EPSG\",4326]],CONVERSION[\"Modified Azimuthal Equidistant\",METHOD[\"Modified Azimuthal Equidistant\",ID[\"EPSG\",9832]],PARAMETER[\"Latitude of natural origin\",53,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8801]],PARAMETER[\"Longitude of natural origin\",24,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8802]],PARAMETER[\"False easting\",5837287.81977,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8806]],PARAMETER[\"False northing\",2121415.69617,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8807]]],CS[Cartesian,2],AXIS[\"easting\",east,ORDER[1],LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]],AXIS[\"northing\",north,ORDER[2],LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]]]"
+    }
+  }
+}

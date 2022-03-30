@@ -1,0 +1,181 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "id": "0",
+      "type": "Feature",
+      "properties": {
+        "target_canopy_cover": 1.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              12.99871308808763,
+              47.84207985681694
+            ],
+            [
+              12.999504808088854,
+              47.84216043366704
+            ],
+            [
+              12.999388046272763,
+              47.842692804442805
+            ],
+            [
+              12.998596318201301,
+              47.84261222656054
+            ],
+            [
+              12.99871308808763,
+              47.84207985681694
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "id": "1",
+      "type": "Feature",
+      "properties": {
+        "target_canopy_cover": 1.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              12.998829854947214,
+              47.84154748684141
+            ],
+            [
+              12.999621566878384,
+              47.84162806265935
+            ],
+            [
+              12.999504808088854,
+              47.84216043366704
+            ],
+            [
+              12.99871308808763,
+              47.84207985681694
+            ],
+            [
+              12.998829854947214,
+              47.84154748684141
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "id": "2",
+      "type": "Feature",
+      "properties": {
+        "target_canopy_cover": 0.6946371943595295
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              12.999388046272763,
+              47.842692804442805
+            ],
+            [
+              13.000179776856099,
+              47.842773376596625
+            ],
+            [
+              13.00006302008387,
+              47.843305748172604
+            ],
+            [
+              12.999271281429998,
+              47.84322517498666
+            ],
+            [
+              12.999388046272763,
+              47.842692804442805
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "id": "3",
+      "type": "Feature",
+      "properties": {
+        "target_canopy_cover": 0.8807129026901547
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              12.999504808088854,
+              47.84216043366704
+            ],
+            [
+              13.00029653060185,
+              47.842241004788754
+            ],
+            [
+              13.000179776856099,
+              47.842773376596625
+            ],
+            [
+              12.999388046272763,
+              47.842692804442805
+            ],
+            [
+              12.999504808088854,
+              47.84216043366704
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "id": "4",
+      "type": "Feature",
+      "properties": {
+        "target_canopy_cover": 1.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              12.999621566878384,
+              47.84162806265935
+            ],
+            [
+              13.000413281321253,
+              47.841708632749
+            ],
+            [
+              13.00029653060185,
+              47.842241004788754
+            ],
+            [
+              12.999504808088854,
+              47.84216043366704
+            ],
+            [
+              12.999621566878384,
+              47.84162806265935
+            ]
+          ]
+        ]
+      }
+    }
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "PROJCRS[\"Azimuthal_Equidistant\",BASEGEOGCRS[\"WGS 84\",DATUM[\"World Geodetic System 1984\",ELLIPSOID[\"WGS 84\",6378137,298.257223563,LENGTHUNIT[\"metre\",1]]],PRIMEM[\"Greenwich\",0,ANGLEUNIT[\"degree\",0.0174532925199433]],ID[\"EPSG\",4326]],CONVERSION[\"Modified Azimuthal Equidistant\",METHOD[\"Modified Azimuthal Equidistant\",ID[\"EPSG\",9832]],PARAMETER[\"Latitude of natural origin\",53,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8801]],PARAMETER[\"Longitude of natural origin\",24,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8802]],PARAMETER[\"False easting\",5837287.81977,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8806]],PARAMETER[\"False northing\",2121415.69617,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8807]]],CS[Cartesian,2],AXIS[\"easting\",east,ORDER[1],LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]],AXIS[\"northing\",north,ORDER[2],LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]]]"
+    }
+  }
+}
