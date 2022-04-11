@@ -1,0 +1,537 @@
+---
+title: "OpenEO Platform Use Case 8 - Local study site selection"
+author: "Mattia Rossi"
+date: "March 23, 2022"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  md_document:
+    variant: markdown_github
+---
+
+# Introduction
+
+This notebook describes the procedure to determine the data for two parts of the openEO Platform Use Case 8: "Fractional Canopy Cover":\
+- **The local test site sampling** procedure to decide the test sites within the study area for which the very high resolution data (VHR) will be acquired.\
+- **The local validation data sampling** necessary for the quality assessment of the final map.\
+
+The **test site sampling**  is the first step of the use case as it delineates suitable test sites as training for a random Forest regression approach. Given the restriction of cost and the wide area to cover in the UC the study sites need to be chosen carefully. We chose to search for 150 test sites with an extent of 16ha each spread equally across the whole study area. Due to the fact that this step had to be done in a very early stage of the project the scripts rely on local versions of the EO layers needed for the computation. This comprises both a heavy computation of 16ha Polygons over the whole area and the implementation of a personalized scoring.\
+The **validation data sampling** has been conducted in parallel to ensure that all the locally sampled datasets are present in an early stage to later focus on the regression and prediction.\
+
+The EO-layers used in this part of the UC are:\
+- The Copernicus Forest High Resolution Layer [Tree Cover Density](https://land.copernicus.eu/pan-european/high-resolution-layers/forests/tree-cover-density)  
+- The Copernicus Forest High Resolution Layer [Dominant Leaf Type](https://land.copernicus.eu/pan-european/high-resolution-layers/forests/dominant-leaf-type)  
+- The [2018 CORINE Land Cover -CLC- data set](https://land.copernicus.eu/pan-european/corine-land-cover/clc2018)
+
+This long notebook has slightly different recurrent terminologies:\
+- *Study Area*: The Whole bounding box of roughly 1 Mio sqkm.\
+- *Tile*: Tiling of the Copernicus forest HRL.\
+- *Potential test sites*: All 16ha Polygons in the Study area.\
+- *Grid*: Gridded (spatial) representation of the potential test sites.\
+- *Test sites*: The final selection of the 150 test areas for the VHR data request.
+
+**NOTE**: This has workflow has been implemented locally and is therefore only partially reprodicible on other distribution. The intermediary data sets, however, are included in */resources/UC8/Local/*
+
+# Setup
+
+The whole workflow was created and is working using R 4.1.2 on a Ubuntu 18.04 bionic distribution.\
+Prior to the actual workflow the necessary R libraries need to be loaded. If they are not yet present on the distribution they have to be installed using the `install_packages()` function.
+
+```{r,warning=F,message=F}
+library("raster")
+library("terra")
+library("sf")
+library("mapview")
+library("dplyr")
+library("tidyr")
+library("purrr")
+library("stars")
+library("starsExtra")
+library("stringr")
+library("tictoc")
+library("readr")
+library("tibble")
+library("parallel")
+library("ggplot2")
+library("exactextractr")
+library("leaflet")
+
+```
+
+# Test site selection
+
+## Import
+
+First of all the Netcdf files with the study site extents are loaded:
+
+```{r,results="hide"}
+eusalpbb<-st_read("resources/UC8/Local/alpinespace_eusalp_boundingbox.shp")
+eusalpbb.sites<-st_make_grid(eusalpbb,n = 13) %>% 
+  st_as_sf() %>% 
+  mutate(ID=c(1:nrow(.))) 
+
+eusalpbb.laea<-eusalpbb %>% st_transform(crs=3035) # LAEA projection applied to fasten some processes
+
+```
+
+Next, the data sets must be imported. This comprises both the study area as well as the HRL and CLC files. Since this approach was created before the collections were available on the back-ends in order to have a quick VHR datacube the files are loaded locally.\
+First we import the CLC as stars proxy object. We can do that just once as it is not tiled or divided otherwise
+
+```{r}
+r.clc   <-read_stars("/mnt/CEPH_PROJECTS/SAO/ForestCanopy/01_Data/CORINE_2018_250m_Raster/DATA/U2018_CLC2018_V2020_20u1.tif",proxy=T)
+clc_classes <- read_csv("resources/UC8/Local/clc_classes_final.csv",show_col_types = F) # The connection between the CLC numeric values and classes
+```
+
+Next we import a csv file containing the tiled Copernicus HRL data as stored locally in the file system
+
+```{r,results="hide"}
+hrl.join <- read_csv("resources/UC8/Local/hrl_table.csv",show_col_types = F)
+```
+
+## Gridding
+
+These sites have the extent of 16ha as defined for the 150 test sites within the study site. Therefore several grids are constructed with polygons of 16ha throughout the study area leading to a total of 3.56 Mio Polygons to be analyzed. The grids are calculated based on the Copernicus HRL tiling for convenience
+
+```{r,eval=F}
+
+for (i in 1: nrow(hrl.join)) {
+
+  data    <- hrl.join$TCD[[i]] # Load the Tree Cover Density representing the extent
+  outfile <- paste0(gridloc,hrl.join$Tile[[i]],"_grid.nc") # Name of the file
+  r1      <- read_stars(data,proxy=T) # Read data as stars proxy to save time
+  r.grid  <- st_make_grid(st_bbox(r1),400) %>% st_transform(crs=3035) # Make Grid across the raster with 400x400m (16ha)
+  r.grid.f<- r.grid[st_within(r.grid,eusalpbb) %>% as.numeric() %>% {which(.==1)}] # CHeck that it is in the actual extent
+  
+  if(length(r.grid.f)>0) st_write(r.grid.f,outfile) # Write the Grid
+  toc()
+}
+
+```
+
+Once the process is finished and the grids exported they are the base for the computation of the metrics.\
+One exemplary grid is illustrated here by the centroids of each Polygon (for faster plotting):
+
+```{r, warning=F}
+example<-st_read("resources/UC8/Local/E38N22_grid.nc")
+mapview(st_centroid(example),layer.name="Polygon Centroids")
+```
+
+## Metrics
+
+After all the potential test sites have been delineated the metrics for the single potential test sites have to be determined. This is done by calculating the metrics of the HRL and CLC Layers for each individual Polygon. This step requires a lot of data to be loaded individually while the metrics are being calculated. In order to use ONE function in a parallelized way, the whole metrics generation is done using the `calcMetric` function below
+
+```{r}
+# R1 object is the tree cover density stars proxy object
+# R2 parameter is the tree type stars proxy object
+# R3 object is the Corine Lanc Cover stars proxy object
+# j is an iterator looping through the grids. This is more efficient than a dedicated for-loop
+calcMetric=function(r1,r2,r3,j){
+  
+  # Crop Stars proxy objects
+  pol       <- r.grid[j,]
+  cr.tcd    <- st_crop(r1,pol)
+  cr.trtype <- st_crop(r2,pol)
+  cr.clc    <- st_crop(r3,pol)
+  
+  # Calculate the TreeDensity
+  cr.tcd2   <- st_as_stars(cr.tcd)
+  tcd.mn    <- as.numeric(as.character(pull(cr.tcd2)))
+  tcd.mn    <- round(mean(tcd.mn,na.rm=T))
+  
+  if(tcd.mn<10 | tcd.mn>90) return(NA)
+  
+  # Calculate the Tree Type / Density and Dominance
+  cr.trtype2 <- st_as_stars(cr.trtype)
+  tree.type  <- table(as.numeric(as.character(pull(cr.trtype2))))
+  
+  if(length(tree.type)<2) return(NA)
+  
+  brd<-as.numeric(tree.type[which(as.numeric(names(tree.type))==1)]) / sum(tree.type)
+  if(length(brd)==0) brd=0
+  con<-as.numeric(tree.type[which(as.numeric(names(tree.type))==2)]) / sum(tree.type)
+  if(length(con)==0) con=0
+  
+  dominance     <- (brd-con)/(brd+con)
+  dominant_type <- ifelse(dominance>0,"BroadLeaved","Coniferous")
+  dominance_abs <- round(abs(dominance)*100)
+  forest.perc   <- round((1-(brd-con))*100)
+  
+  if(forest.perc<10 | forest.perc>90) return(NA)
+  
+  # Calculate the CLC Objects
+  cr.clc2   <- st_as_stars(cr.clc)
+  clc.res   <- pull(cr.clc2) %>% as.character %>% as.numeric %>% table %>% as_tibble()
+  colnames(clc.res)=c("Raster_ID","n")
+  clc.res2  <- clc.res %>% mutate(Raster_ID=as.numeric(Raster_ID))
+  clc.res3  <- left_join(clc_classes3,clc.res2,by = "Raster_ID") %>% na.omit %>% select(L1_class,Target,n)
+  
+  if(any(clc.res3=="Forests")){
+    
+    if(nrow(clc.res3)==1) return(NA)
+    
+    clc.nclasses<-nrow(clc.res3)
+    clc.forest <- as.numeric(round((filter(clc.res3,Target=="Forests")$n / sum(clc.res3$n))*100) )
+    
+    if(clc.forest<10 | clc.forest>90) return(NA)
+    if(clc.nclasses<2 | clc.nclasses==5) return(NA)
+    
+    clc.other <- filter(clc.res3,Target!="Forests") 
+    clc.other <- arrange(clc.other,n)
+    clc.other <- clc.other$Target[1]
+    
+  } else { return(NA) }
+  
+  # Combine the results in one dataframe
+  b1<-bind_cols(DomAbs=dominance_abs,DomType=dominant_type,
+                HRLPerc=forest.perc,Density=tcd.mn,
+                CLCclasses=clc.nclasses,CLCperc=clc.forest,CLCother=clc.other)
+  
+  return(b1)
+  
+}
+```
+
+The function needs to be applied to each polygon through a for loop.\
+**ATTENTION**: This process is heavily parallelized with the `parallel` package. Please pay attention to the deployable resources in your OS.
+
+```{r,eval=F}
+
+for(i in 1:nrow(hrl.join)){
+  
+  # Read and Format the Raster
+  r1<-read_stars(hrl.join$TCD[[i]],proxy=T)
+  r2<-read_stars(hrl.join$DLT[[i]],proxy=T)
+  r.grid      <- st_read(hrl.join$Grid[[i]],quiet = T) %>% st_transform(crs=st_crs(r1)) %>% st_as_sf
+  r.grid$ID   <- c(1:length(r.grid))
+  r.grid$Area <- st_area(r.grid)
+  
+  ith <-as.list(c(1:nrow(r.grid)))
+  
+  # Parallelization
+  no_cores <- detectCores()-1
+  clust <- makeCluster(no_cores,outfile="Log/Log.txt")
+  clusterExport(cl=clust,varlist=c("r.grid","r1","r2","r3","ith","calcMetric","clc_classes3"))
+  a<-clusterEvalQ(
+    cl=clust,
+    c(library("stars"),library("dplyr"),library("tidyr"),library("sf"),library("tibble")))
+  pl<-parLapply(cl=clust, ith, function(x) calcMetric(r1,r2,r3,x))
+  stopCluster(clust)
+  
+  # Tidy the parallelization result
+  nisna<-which(!is.na(pl))
+  r.grid2<-r.grid %>% 
+    mutate(Data=pl) %>% 
+    slice(nisna) %>% 
+    unnest(Data)
+
+  # Save the Result
+  out2<-paste0(shapeloc,hrl.join$Tile[[i]],"_shapefile_select_noscore.nc")
+  
+  if(nrow(r.grid)>0) st_write(r.grid2,out2)
+
+}
+
+
+```
+
+This is the structure of the final metrics dataset:
+
+```{r}
+data<-st_read("resources/UC8/Local/E38N22_shapefile_select_noscore.nc")
+data
+```
+
+While this plot represents the potential test sites colored by the Tree Cover Density from the HRL:
+
+```{r}
+
+example.bbox<-st_as_sfc(st_bbox(example))
+mapview(example.bbox,layer.name="Example Grid Boundary")+
+  mapview(data,zcol="HRLPerc",layer.name="Tree Cover Density")
+```
+
+## Scoring
+
+Based on the Metrics a scoring system needs to be implemented. This means that the target variables need to be defined based on a universally valid scheme to determine which potential sites are actually most important for the detection of the FCC target variable. There are three scoring schemes:\
+- **Tree Density**: The tree density of the 16ha site. The score is highest when approx. 50% as there are both forested and non-forested Pixels for training \
+- **CLC Classes**: 2 to three classes preferred. Once class would be only forest and more than three might introduce noises or difficulties to discriminate between classes. \
+- **Tree Dominance**. The more dominant one tree type the better. This reduces the probability of mixed forests
+
+```{r}
+
+# Tree density and forest percentage
+Values<-c(0:100)
+Score <-c(0,rep(1:5,each=10),rep(5:1,each=10))
+score_density <-bind_cols(Values=Values,Score=Score)
+
+# CLC Classes
+Values<-c(1:10)
+Score <-c(1,5,5,3,1,0,0,0,0,0)
+score_nclc <-bind_cols(Values=Values,Score=Score)
+
+# Tree Dominance
+Values<-c(0:100)
+Score <-c(0,rep(1:5,each=20,len=100))
+score_dom <-bind_cols(Values=Values,Score=Score)
+
+```
+
+In total five scores are used for the final decision. While the **CLC classes** and the **Tree Dominance** are used once on the respective layers the **Tree Density** scoring scheme is used for three separate layers: HRL tree percentage, CLC tree percentage and HRL tree density. An overview can be seen in the following picture:
+
+```{r}
+
+finaltable<- readRDS("resources/UC8/Local/scoretable.rds")
+ggplot(finaltable,aes(x=Values,y=Score))+
+  geom_point(alpha=0.2)+
+  geom_line()+
+  facet_wrap(~Type,scales="free_x")+
+  ggtitle("Score crierions for the VHR data test site derivation")
+
+```
+
+Now the scores are calculated iteratively for each of the polygons and appended to the overall shapefile. Additionally, the `eusalpbb_sites` extent is reprojected to the matching CRS in order to calculate the scores at the right location. *Given the huge file size the files are loaded locally*
+
+```{r}
+data.noscore <- list.files("/mnt/CEPH_PROJECTS/SAO/ForestCanopy/02_Products/01_StudyArea/AllShapes/",full.names=T)
+polymaster   <- st_read(data.noscore[1],quiet=T)
+tls          <- st_transform(eusalpbb.sites,st_crs(polymaster))
+```
+
+```{r,eval=F}
+
+all<-list()
+for(i in 1:length(data.noscore)){
+  
+  # Read the Polygon(s)
+  poly<-st_read(data.noscore[i],quiet=T)
+  if(nrow(poly)==0) next
+  
+  # Check if the Polygons are in the EUSALP boundng box
+  within <- as.numeric(st_within(poly,tls))
+  
+  # Filter if they are not in the Extent
+  poly2<-poly %>% 
+    mutate(inTile=within) %>% 
+    filter(!is.na(inTile)) %>% 
+    na.omit()
+  
+  # Calculate the scores
+  poly2.score<-poly2 %>% 
+    mutate(ScoreDom   = map_dbl(DomAbs,    function(x) unlist(score_dom[which(score_dom$Values==x),2]))) %>% 
+    mutate(ScorePerc1 = map_dbl(HRLPerc,   function(x) unlist(score_density[which(score_density$Values==x),2]))) %>% 
+    mutate(ScorePerc2 = map_dbl(CLCperc,   function(x) unlist(score_density[which(score_density$Values==x),2]))) %>% 
+    mutate(ScoreCLC   = map_dbl(CLCclasses,function(x) unlist(score_nclc[which(score_nclc$Values==x),2]))) %>% 
+    mutate(ScoreDens  = map_dbl(Density,   function(x) unlist(score_density[which(score_density$Values==x),2]))) %>% 
+    mutate(ScoreAll   = ScoreDom+ScorePerc1+ScorePerc2+ScoreCLC+ScoreDens)
+  
+  # Add to the list
+  all[[i]]<-poly2.score
+  
+}
+
+# Combine ALL Polygons to one sf file
+# This process may take a while. Approximately 870000 Shapefiles were produced
+comb<-sf::st_as_sf(data.table::rbindlist(all)) %>% arrange(inTile)
+```
+
+This is the result of the computation with the single scores appeneded as columns together with the summary - the total scoring by Polygon. *This file is loaded from local as it has a total size of approximately 1Gb*
+
+```{r}
+comb<-st_read("/mnt/CEPH_PROJECTS/SAO/ForestCanopy/02_Products/01_StudyArea/SuitableSitesVHR_all.nc")
+comb
+```
+
+## Selection
+
+Once all the polygons are associated to a scoring the complete data set needs to be reduced to the final 150 test sites.
+
+### By Tiles
+
+A first step is to reduce the tiles to the 150 with the best / most suitable test sites. This is done by sorting and reducing them:
+
+```{r}
+comb.bytile<-comb$inTile %>% 
+  table %>% 
+  as_tibble() %>% 
+  setNames(c("ID","Polygons")) %>% 
+  mutate(ID=as.numeric(ID))
+polybytile<-left_join(eusalpbb.sites,comb.bytile) %>% 
+  na.omit %>% 
+  arrange(desc(Polygons))
+
+selectedTiles<-polybytile[1:150,]
+mapview(selectedTiles)
+```
+
+### By Score
+
+Now the overall potential test sites are reduced and sorted by the scores.
+
+```{r,eval=F}
+all2<-list()
+for(i in 1:nrow(selectedTiles)){
+
+  sel<-comb %>% filter(inTile==selectedTiles$ID[[i]]) %>% arrange(desc(ScoreAll))
+  sel2<-sel %>% filter(ScoreAll==max(sel$ScoreAll))
+  all2[[i]]<-sel2
+}
+
+comb2<-sf::st_as_sf(data.table::rbindlist(all2)) %>% arrange(inTile)
+
+```
+
+## Final test sites
+
+Finally, the test sites must be reduced to 150 for the VHR data as agreed in the KO meeting. This is the actual extent for which we were capable to obtain data. As they should be spread throughout the study site one Polygon is extracted for each of the previously defined tiles `selectedTiles`. In order to make the selection reproducible the `set_seed` function - a random Number generator - is called at the beginning of each iteration
+
+```{r,eval=F}
+all3<-list()
+for(i in 1:nrow(selectedTiles)){
+
+  set.seed(i) # The seed for the random number generator
+  tosample <-comb2 %>% filter(inTile==selectedTiles$ID[[i]]) # Get one Tile
+  smp      <-sample(1:nrow(tosample),1) # Get one random sample per site
+  issample <-tosample[smp,] # Sample one Polygon
+  all3[[i]]<-issample # Attach the Polygon to a list
+}
+
+comb3<-sf::st_as_sf(data.table::rbindlist(all3)) # reduce the list to a single shapefile
+```
+
+The `comb3` dataset represents the final selected Polygons per Tile as base for the Planetscope data request. This request has been performed by Sinergise and the corresponding collection is hosted on the VITO back-end and [visible in the openEO Platform Collectons](https://openeo.cloud/data-collections/).
+
+The simple features vector file for the final selection is in the [SRR-3 Github repository]() of the study sites can be seen here:
+
+```{r}
+final_sites<-st_read("resources/UC8/Local/SuitableSitesVHR_selected_country.nc")
+final_sites
+
+```
+
+and a graphic representation of the test sites here. For better plotting purposes, all datasets are converted to Lat/Lon WGS84:
+
+```{r}
+final_sites_center <- st_centroid(final_sites) %>% st_transform(4326)
+
+mapview(final_sites_center,layer.name="Selected Test Sites",col.regions="red",alpha=0)+
+  mapview(selectedTiles,layer.name="Selected Subtiles")+
+  mapview(eusalpbb,layer.name="EUSALP BoundingBox",alpha.regions=0.1,color="green",col.regions="green")
+```
+
+# Validation data
+
+Based on the calculations that we have done in the test site retrieval we also extracted the validation sites at a very early stage of the use case. It was important, however to not include the test sites as validation sites. Therefore the search of the validation data is performed surrounding these sites. As input we used the FCC target variable NetCDF files as [uploaded in the SRR3 Notebooks](https://github.com/openEOPlatform/SRR3_notebooks/tree/main/notebooks/resources/UC8/vector_data/target_canopy_cover_60m_equi7).
+
+## Import
+
+For the derivation of the validation data we need the following dataset / information:
+
+```{r}
+fls=list.files("/mnt/CEPH_PROJECTS/SAO/ForestCanopy/SRR3_notebooks/notebooks/resources/UC8/vector_data/target_canopy_cover_60m_equi7/",full.names=T) # List of the resampled target variable
+
+res=60 # Target resolution
+```
+
+## Gridding
+
+Now the shapefiles surrounding the test sites are defined. We sample points on a regular 60m grid (as the target variable resolution) surround the study target variable Pixel. From the resulting potential points we select 20 with a random number generator and combine the result in the `shp.dat` spatial file. The grids for each study site are stored in the `grid.dat` object.
+
+```{r,eval=F}
+shapelist= list()
+gridlist = list()
+
+for(i in 1:length(fls)){
+  
+  shp1  <-st_read(fls[i],quiet=T) %>% st_transform(crslaea)
+  shp1c <-st_centroid(shp1)
+  
+  # Create a sequence of coordinates outside of the actual study area
+  tseq <- c(seq(1000,res*1000,res*10),seq(-1000,-(res*1000),-(res*10)))
+  grid <- expand_grid(X=st_coordinates(shp1c[1,])[1]+tseq,Y=st_coordinates(shp1c[1,])[2]+tseq)
+  shp2 <- st_as_sf(grid,coords=c("X","Y"),crs=st_crs(shp1)) %>% mutate(ID=i)
+  gridlist[[i]]<-grid
+  
+  # Search in case any of the Shapes is outside the bounding Box
+  wh<-which(st_within(shp2,eusalpbb.laea,sparse = F)==T)
+  shp.within<-shp2[wh,]
+  
+  # Randomly sample 20 sites. The set.seed determines the Random Number generator for reproducability
+  set.seed(10)
+  smp <- sample(nrow(shp.within),20)
+  
+  # Extract the 20 sites and create a square buffer around them (representing the test site Polygons)
+  shp.smp       <-shp.within[smp,]
+  result        <-st_buffer(shp.smp,60/2,endCapStyle="SQUARE",nQuadSegs=1)
+  shapelist[[i]]<-result
+  
+}
+
+shp.dat=do.call(bind_rows,shapelist)
+grid.dat=do.call(bind_rows,shapelist)
+
+```
+
+A zoomed in plot of the study site shows that the grid is not interferring with the study site and therefore offers validation sites not touched by the training of the model.
+
+```{r}
+shp.dat<-st_read("/mnt/CEPH_PROJECTS/SAO/ForestCanopy/SRR3_notebooks/notebooks/extdata/ValPol_UC8_raw.nc")
+grid.dat<-st_read("/mnt/CEPH_PROJECTS/SAO/ForestCanopy/SRR3_notebooks/notebooks/extdata/ValGrid_UC8_raw1.nc")
+pnt  = shp.dat[1,] %>% st_transform(4326)
+grid = grid.dat %>% st_transform(4326)
+
+mv <- mapview(grid,layer.names="Potential Validation Sites")+
+      mapview(pnt,names="Study site Polygons", col.regions="red")
+
+pnt.coords = pnt %>% st_bbox %>% st_as_sfc %>% st_centroid %>% st_coordinates 
+mv@map %>%  setView(pnt.coords[1], pnt.coords[2], zoom = 12)
+
+```
+
+## Site Selection
+
+Here we have to see which of the HRL Tiles are connected to which Polygon in order to reduce computing time
+
+```{r}
+TCD.dat   <- st_read("/mnt/CEPH_PROJECTS/SAO/ForestCanopy/SRR3_notebooks/notebooks/extdata/HRL_bboxs.nc")
+is_within <- st_within(shp.dat,TCD.dat)
+tcd_file  <- sapply(is_within,function(x) x[1])
+shp.dat2  <- na.omit(mutate(shp.dat, TrDens=tcd_file))
+```
+
+Now we can calculate the tree cover density representing a proxy for the forest canopy cover.
+
+```{r, eval=F}
+
+for(i in 1:nrow(shp.dat2)){
+  
+  indata <- trdens[shp.dat2$TrDens[i]]
+  if(is.na(indata)) treecovernext()
+  
+  rt <- terra::rast(indata)
+  target <- shp.dat2[i,1]
+  treecover[[i]] <- exact_extract(rt,target,fun="mean")
+  print(paste(i,"of",nrow(shp.dat2)))
+  
+}
+
+treecover2<- round(unlist(treecover),2)
+treecover2[treecover2>100]=NA
+final_val_data<-shp.dat2 %>% mutate(Density=unlist(treecover2)) %>% na.omit
+```
+
+The final validation data (`final_val_data`) can be found in the *resources/UC8* directory and is used later on to validate the FCC maps.
+
+```{r,warning=F}
+
+final_val_data   = st_read("/mnt/CEPH_PROJECTS/SAO/ForestCanopy/SRR3_notebooks/notebooks/resources/UC8/validation_data_UC8_EusalpBB.nc")
+final_val_data_c = st_centroid(final_val_data)
+
+mapview(final_val_data_c,zcol="Density",layer.name="Fractional Canopy Cover")+ 
+  mapview(eusalpbb.laea,layer.name="Eusalp Bounding Box")
+
+```
+
