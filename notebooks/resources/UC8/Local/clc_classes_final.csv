@@ -1,0 +1,46 @@
+Class,Name,L1_class,L2_class,Raster_ID,Type,Target
+111,Continuous urban fabric,1,11,1,Artificial Surfaces,Artificial Surfaces
+112,Discontinuous urban fabric,1,11,2,Artificial Surfaces,Artificial Surfaces
+121,Industrial or commercial units,1,12,3,Artificial Surfaces,Artificial Surfaces
+122,Road and rail networks and associated land,1,12,4,Artificial Surfaces,Artificial Surfaces
+123,Port areas,1,12,5,Artificial Surfaces,Artificial Surfaces
+124,Airports,1,12,6,Artificial Surfaces,Artificial Surfaces
+131,Mineral extraction sites,1,13,7,Artificial Surfaces,Artificial Surfaces
+132,Dump sites,1,13,8,Artificial Surfaces,Artificial Surfaces
+133,Construction sites,1,13,9,Artificial Surfaces,Artificial Surfaces
+141,Green urban areas,1,14,10,Artificial Surfaces,Artificial Surfaces
+142,Sport and leisure facilities,1,14,11,Artificial Surfaces,Artificial Surfaces
+211,Non-irrigated arable land,2,21,12,Agricultural Surfaces,Agricultural Surfaces
+212,Permanently irrigated land,2,21,13,Agricultural Surfaces,Agricultural Surfaces
+213,Rice fields,2,21,14,Agricultural Surfaces,Agricultural Surfaces
+221,Vineyards,2,22,15,Agricultural Surfaces,Agricultural Surfaces
+222,Fruit trees and berry plantations,2,22,16,Agricultural Surfaces,Agricultural Surfaces
+223,Olive groves,2,22,17,Agricultural Surfaces,Agricultural Surfaces
+231,Pastures,2,23,18,Agricultural Surfaces,Agricultural Surfaces
+241,Annual crops associated with permanent crops,2,24,19,Agricultural Surfaces,Agricultural Surfaces
+242,Complex cultivation patterns,2,24,20,Agricultural Surfaces,Agricultural Surfaces
+243,Land principally occupied by agriculture with significant areas of natural vegetation,2,24,21,Agricultural Surfaces,Agricultural Surfaces
+244,Agro-forestry areas,2,24,22,Agricultural Surfaces,Agricultural Surfaces
+311,Broad-leaved forest,3,31,23,Forested And Seminatural areas,Forests
+312,Coniferous forest,3,31,24,Forested And Seminatural areas,Forests
+313,Mixed forest,3,31,25,Forested And Seminatural areas,Forests
+321,Natural grasslands,3,32,26,Forested And Seminatural areas,Forested And Seminatural areas
+322,Moors and heathland,3,32,27,Forested And Seminatural areas,Forested And Seminatural areas
+323,Sclerophyllous vegetation,3,32,28,Forested And Seminatural areas,Forested And Seminatural areas
+324,Transitional woodland-shrub,3,32,29,Forested And Seminatural areas,Forested And Seminatural areas
+331,Beaches dunes sands,3,33,30,Forested And Seminatural areas,Forested And Seminatural areas
+332,Bare rocks,3,33,31,Forested And Seminatural areas,Forested And Seminatural areas
+333,Sparsely vegetated areas,3,33,32,Forested And Seminatural areas,Forested And Seminatural areas
+334,Burnt areas,3,33,33,Forested And Seminatural areas,Forested And Seminatural areas
+335,Glaciers and perpetual snow,3,33,34,Forested And Seminatural areas,Forested And Seminatural areas
+411,Inland marshes,4,41,35,Wetlands,Wetlands
+412,Peat bogs,4,41,36,Wetlands,Wetlands
+421,Salt marshes,4,42,37,Wetlands,Wetlands
+422,Salines,4,42,38,Wetlands,Wetlands
+423,Intertidal flats,4,42,39,Wetlands,Wetlands
+511,Water courses,5,51,40,Water Bodies,Water Bodies
+512,Water bodies,5,51,41,Water Bodies,Water Bodies
+521,Coastal lagoons,5,52,42,Water Bodies,Water Bodies
+522,Estuaries,5,52,43,Water Bodies,Water Bodies
+523,Sea and ocean,5,52,44,Water Bodies,Water Bodies
+999,NODATA,9,99,48,Other,Other
