@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "mgrs_belgium",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "name": "31UFS_0_0", "origin": "SRID=32631;POINT(600000.0 5700000.0)" }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ 4.411317299688021, 50.542660315444245 ], [ 4.438876794391232, 51.44235231526482 ], [ 5.87744073008491, 51.41585536563737 ], [ 5.82239523352081, 50.516994819495949 ], [ 4.411317299688021, 50.542660315444245 ] ] ] ] } }
+]
+}

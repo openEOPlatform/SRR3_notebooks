@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "belgium_aoi_medium",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": 0 }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ 2.404434640418915, 51.58810058445242 ], [ 6.260427604131817, 51.371732241799187 ], [ 6.16769831442329, 49.509419006819613 ], [ 3.238998247795656, 50.00397521859842 ], [ 2.404434640418915, 51.58810058445242 ] ] ] ] } }
+]
+}
